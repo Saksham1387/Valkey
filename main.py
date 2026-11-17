@@ -13,12 +13,13 @@ class KeyIn(BaseModel):
 
 @app.put("/keys/{key}")
 def put(key: str, body: KeyIn):
-    store[key] = body.value
     seq = seq + 1
     data = {"seq":seq,"op":"put","key":key,"value":body.value}
+    
     with open("WAL.json", "w") as file:
         json.dump(data, file, indent=4)
 
+    store[key] = body.value
     return {"key": key, "value": body.value}
 
 @app.get("/keys/{key}")
