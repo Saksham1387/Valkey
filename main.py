@@ -1,25 +1,36 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import json 
+import threading
+from wal import WAL
 
 app = FastAPI()
-
-seq
 
 store: dict[str,str] = {}
 
 class KeyIn(BaseModel):
     value: str
 
+wal = WAL("wal.log")
+lock = threading.Lock()
+
+seq = 0
+
+for op in wal.replay():
+    seq = max(seq, op["seq"])
+    if op["op"] == "put":
+        store[op["key"]] = op["value"]
+    elif op["op"] == "delete":
+        store.pop(op["key"], None)
+
 @app.put("/keys/{key}")
 def put(key: str, body: KeyIn):
-    seq = seq + 1
-    data = {"seq":seq,"op":"put","key":key,"value":body.value}
-    
-    with open("WAL.json", "w") as file:
-        json.dump(data, file, indent=4)
-
-    store[key] = body.value
+    global seq
+    with lock:
+        seq += 1
+        data = {"seq":seq,"op":"put","key":key,"value":body.value}
+        wal.append(data)
+        store[key] = body.value
     return {"key": key, "value": body.value}
 
 @app.get("/keys/{key}")
@@ -30,5 +41,9 @@ def get(key: str):
 
 @app.delete("/keys/{key}")
 def delete(key: str):
-    store.pop(key, None)
+    global seq
+    with lock:
+        seq += 1
+        wal.append({"seq": seq, "op": "delete", "key": key})
+        store.pop(key, None)
     return {"deleted": key}
