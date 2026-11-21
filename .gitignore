@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Rust build artifacts and local node data
+/target/
+/data/
